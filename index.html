@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Span Checker – linear algebra helper</title>
+<style>
+  :root {
+    --paper: #f6f8fb;
+    --grid: #dbe3ee;
+    --ink: #17233b;
+    --muted: #55627a;
+    --accent: #1f4fd8;
+    --good: #14724a;
+    --bad: #a3282c;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--ink);
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+    line-height: 1.6;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 20px 60px; }
+  h1 { font-size: clamp(2rem, 6vw, 3rem); margin: 0 0 8px; letter-spacing: -0.5px; }
+  .lead { color: var(--muted); font-size: 1.1rem; margin: 0 0 28px; max-width: 60ch; }
+  .card {
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    padding: 22px;
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+  label { display: block; font-weight: bold; margin: 0 0 6px; }
+  .hint { font-weight: normal; color: var(--muted); font-size: 0.92rem; }
+  textarea, input[type="text"] {
+    width: 100%;
+    font: 1.05rem "Courier New", monospace;
+    padding: 10px;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  .field { margin-bottom: 18px; }
+  .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  button {
+    font: bold 1rem Georgia, serif;
+    padding: 10px 18px;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+  }
+  button.secondary { background: #fff; color: var(--ink); }
+  button:hover { filter: brightness(1.1); }
+  :focus-visible { outline: 3px solid #f2a900; outline-offset: 2px; }
+  #result { margin-top: 24px; display: none; }
+  #result h2 { margin: 0 0 10px; font-size: 1.25rem; }
+  .row { padding: 8px 0; border-top: 1px solid var(--grid); }
+  .yes { color: var(--good); font-weight: bold; }
+  .no { color: var(--bad); font-weight: bold; }
+  .error { color: var(--bad); font-weight: bold; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 0.9rem; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Span Checker</h1>
+  <p class="lead">Type in some vectors and see how many dimensions they span, whether they are linearly independent, and whether another vector lies in their span.</p>
+
+  <div class="card">
+    <div class="field">
+      <label for="vectors">Your vectors <span class="hint">(one vector per line, numbers separated by commas)</span></label>
+      <textarea id="vectors" spellcheck="false">1, 0, 2
+0, 1, 1
+1, 1, 3</textarea>
+    </div>
+
+    <div class="field">
+      <label for="target">Vector to test <span class="hint">(optional, same number of entries)</span></label>
+      <input type="text" id="target" value="2, 3, 7" spellcheck="false">
+    </div>
+
+    <div class="buttons">
+      <button id="check">Check</button>
+      <button id="reset" class="secondary">Reset</button>
+    </div>
+
+    <div id="result" aria-live="polite"></div>
+  </div>
+
+  <footer>
+    How it works: the vectors are placed in a matrix and reduced with Gaussian elimination. The rank of that matrix is the dimension of the span. Source code on GitHub.
+  </footer>
+</main>
+
+<script>
+  const vectorsBox = document.getElementById("vectors");
+  const targetBox = document.getElementById("target");
+  const resultBox = document.getElementById("result");
+  const defaults = { vectors: vectorsBox.value, target: targetBox.value };
+
+  // Turn text like "1, 2, 3" into [1, 2, 3]. Returns null if something is not a number.
+  function parseVector(text) {
+    const parts = text.split(",").map(s => s.trim());
+    const nums = parts.map(Number);
+    if (parts.some(p => p === "") || nums.some(n => Number.isNaN(n))) return null;
+    return nums;
+  }
+
+  // Rank of a matrix (list of rows) using Gaussian elimination.
+  function rank(matrix) {
+    const m = matrix.map(row => row.slice());
+    const rows = m.length;
+    const cols = m[0].length;
+    const eps = 1e-9;
+    let r = 0;
+    for (let c = 0; c < cols && r < rows; c++) {
+      let pivot = r;
+      for (let i = r + 1; i < rows; i++) {
+        if (Math.abs(m[i][c]) > Math.abs(m[pivot][c])) pivot = i;
+      }
+      if (Math.abs(m[pivot][c]) < eps) continue;
+      [m[r], m[pivot]] = [m[pivot], m[r]];
+      for (let i = r + 1; i < rows; i++) {
+        const factor = m[i][c] / m[r][c];
+        for (let j = c; j < cols; j++) m[i][j] -= factor * m[r][j];
+      }
+      r++;
+    }
+    return r;
+  }
+
+  function show(html) {
+    resultBox.style.display = "block";
+    resultBox.innerHTML = html;
+  }
+
+  function check() {
+    const lines = vectorsBox.value.split("\n").map(l => l.trim()).filter(l => l !== "");
+    if (lines.length === 0) { show('<p class="error">Please enter at least one vector.</p>'); return; }
+
+    const vectors = lines.map(parseVector);
+    if (vectors.some(v => v === null)) {
+      show('<p class="error">Every entry must be a number, for example: 1, 0, 2</p>');
+      return;
+    }
+    const n = vectors[0].length;
+    if (vectors.some(v => v.length !== n)) {
+      show('<p class="error">All vectors must have the same number of entries.</p>');
+      return;
+    }
+
+    const rk = rank(vectors);
+    const independent = rk === vectors.length;
+    let html = "<h2>Result</h2>";
+    html += `<div class="row">Dimension of the span: <b>${rk}</b> (inside R<sup>${n}</sup>)</div>`;
+    html += `<div class="row">Linearly independent: ${independent
+      ? '<span class="yes">Yes</span>'
+      : '<span class="no">No</span> (at least one vector is a combination of the others)'}</div>`;
+    html += `<div class="row">Span fills all of R<sup>${n}</sup>: ${rk === n
+      ? '<span class="yes">Yes</span>'
+      : '<span class="no">No</span> (it is a smaller subspace)'}</div>`;
+
+    const targetText = targetBox.value.trim();
+    if (targetText !== "") {
+      const t = parseVector(targetText);
+      if (t === null || t.length !== n) {
+        html += `<div class="row error">The test vector must have exactly ${n} numbers.</div>`;
+      } else {
+        const inSpan = rank([...vectors, t]) === rk;
+        html += `<div class="row">Test vector (${t.join(", ")}) is in the span: ${inSpan
+          ? '<span class="yes">Yes</span>'
+          : '<span class="no">No</span>'}</div>`;
+      }
+    }
+    show(html);
+  }
+
+  document.getElementById("check").addEventListener("click", check);
+  document.getElementById("reset").addEventListener("click", () => {
+    vectorsBox.value = defaults.vectors;
+    targetBox.value = defaults.target;
+    resultBox.style.display = "none";
+  });
+</script>
+</body>
+</html>
