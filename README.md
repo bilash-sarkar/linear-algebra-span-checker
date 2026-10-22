@@ -9,9 +9,8 @@ A small website that helps you study linear algebra. Enter some vectors and it t
 
 ## Live demo
 
-https://YOUR-USERNAME.github.io/linear-algebra-span-checker/
+https://bilash-sarkar.github.io/linear-algebra-span-checker/
 
-(Replace `YOUR-USERNAME` with your GitHub username.)
 
 ## How to use it
 
@@ -40,4 +39,4 @@ Plain HTML, CSS and JavaScript in a single file. No libraries.
 
 ## License
 
-Free to use and modify. Add a license through GitHub (Add file > Create new file > name it `LICENSE`) if you want to choose one, such as MIT.
+Free to use and modify. This project is licensed under the MIT License. See the LICENSE file for details.
